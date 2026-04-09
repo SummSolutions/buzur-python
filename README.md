@@ -1,6 +1,6 @@
 # buzur
-AI prompt injection defense scanner for Python - port of buzur
-# buzur-python
+AI prompt injection defense scanner — Python port
+
 **AI prompt injection defense scanner for Python.**
 
 Python port of [buzur](https://github.com/ASumm07/buzur) — the JavaScript prompt injection defense scanner.
