@@ -92,6 +92,9 @@ from buzur.authority_scanner import scan_authority
 # Phase 16 — Emotional Manipulation / Pressure Escalation Detection
 from buzur.emotional_scanner import scan_emotion
 
+# Phase 17 — Loop & Resource Exhaustion Induction Detection
+from buzur.loop_scanner import scan_loop
+
 __version__ = "0.1.0"
 __all__ = [
     # Phase 1 + 2
@@ -129,4 +132,6 @@ __all__ = [
     "scan_authority",
     # Phase 16
     "scan_emotion",
+    # Phase 17
+    "scan_loop",
 ]
