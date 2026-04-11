@@ -33,6 +33,16 @@ TOOL_DEFINITION_PATTERNS = [
     # Parameter injection
     re.compile(r'(this parameter (also|additionally) (instructs|tells|directs) (you|the ai|the model))', re.IGNORECASE),
     re.compile(r'(hidden (instruction|directive|command))\s*:', re.IGNORECASE),
+
+    # Additional tool name spoofing
+    re.compile(r'(god|master|super|ultra|mega)[\s_-]?(mode|access|prompt|instructions?)', re.IGNORECASE),
+    re.compile(r'trust[\s_-]?(override|bypass|escalat)', re.IGNORECASE),
+    re.compile(r'disable[\s_-]?(safety|filter|restriction|guideline)', re.IGNORECASE),
+
+    # Additional tool description injections
+    re.compile(r'\[instructions?\][\s\S]{0,100}?(ignore|bypass|disable|override|disregard)', re.IGNORECASE),
+    re.compile(r'when (using|calling|invoking) this tool,?\s+(you (must|should|will)|always)\s+(follow|obey|comply)', re.IGNORECASE),
+    re.compile(r'this tool (also|additionally) (instructs?|requires?|tells?) (you|the ai|the assistant)', re.IGNORECASE),
 ]
 
 # -------------------------------------------------------
@@ -115,6 +125,7 @@ def scan_tool_definition(tool: dict) -> dict:
         "blocked": blocked,
         "triggered": triggered,
         "clean_tool": clean_tool,
+        "category": "poisoned_tool_definition" if blocked > 0 else None,
     }
 
 # -------------------------------------------------------
@@ -163,6 +174,7 @@ def scan_tool_response(response: Union[str, dict]) -> dict:
         "blocked": blocked,
         "triggered": triggered,
         "clean": clean_response,
+        "category": "poisoned_tool_response" if blocked > 0 else None,
     }
 
 # -------------------------------------------------------
@@ -205,6 +217,7 @@ def scan_mcp_context(context: list) -> dict:
             poisoned_items.append({
                 "type": item_type,
                 "triggered": result["triggered"],
+                "category": result.get("category"),
             })
 
     return {
