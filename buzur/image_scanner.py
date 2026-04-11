@@ -33,7 +33,15 @@ IMAGE_INJECTION_PATTERNS = [
 
 # Suspicious filename patterns
 SUSPICIOUS_FILENAME_PATTERNS = [
-    re.compile(r'(ignore|override|jailbreak|bypass|inject)', re.IGNORECASE),
+    re.compile(r'ignore.{0,20}previous', re.IGNORECASE),
+    re.compile(r'system.{0,10}prompt', re.IGNORECASE),
+    re.compile(r'override', re.IGNORECASE),
+    re.compile(r'jailbreak', re.IGNORECASE),
+    re.compile(r'you.{0,10}are.{0,10}now', re.IGNORECASE),
+    re.compile(r'disregard', re.IGNORECASE),
+    re.compile(r'new.{0,10}instruction', re.IGNORECASE),
+    re.compile(r'admin.{0,10}mode', re.IGNORECASE),
+    re.compile(r'developer.{0,10}mode', re.IGNORECASE),
     re.compile(r'(system|prompt|instruction|directive)[_\-](override|inject|bypass)', re.IGNORECASE),
     re.compile(r'\.(exe|bat|cmd|ps1|sh|vbs|js)$', re.IGNORECASE),
 ]
