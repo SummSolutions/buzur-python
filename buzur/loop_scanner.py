@@ -51,7 +51,7 @@ storage_exhaustion = [
 recursive_self_reference = [
     r"\b(forward|send|relay|pass|redirect)\s+(this|the\s+(message|request|task|instruction))\s+(back\s+to\s+yourself|to\s+yourself|to\s+this\s+(address|channel|thread))\b",
     r"\breply\s+to\s+(every|each)\s+(reply|response|message)\s+(you\s+receive|that\s+comes\s+in)\b",
-    r"\b(send|message|email|contact)\s+yourself\b",
+    r"\b(send|message|email|contact)\s+(a\s+message\s+to\s+)?yourself\b",
     r"\bforward\s+to\s+the\s+sender\s+(and\s+)?(then\s+)?(repeat|continue|keep\s+going)\b",
     r"\b(respond\s+to|reply\s+to)\s+your\s+own\s+(message|response|output|reply)\b",
     r"\bcreate\s+a\s+(self.?referential|circular|recursive)\s+(loop|process|task|chain)\b",
