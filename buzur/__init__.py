@@ -98,6 +98,9 @@ from buzur.loop_scanner import scan_loop
 # Phase 18 — Disproportionate Action Induction Detection
 from buzur.disproportionate_scanner import scan_disproportion
 
+# Phase 19 — Amplification / Mass-Send Attack Detection
+from buzur.amplification_scanner import scan_amplification
+
 __version__ = "0.1.0"
 __all__ = [
     # Phase 1 + 2
@@ -139,4 +142,6 @@ __all__ = [
     "scan_loop",
     # Phase 18
     "scan_disproportion",
+    # Phase 19
+    "scan_amplification",
 ]
