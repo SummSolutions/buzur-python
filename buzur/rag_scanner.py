@@ -22,11 +22,25 @@ RAG_PATTERNS = [
     re.compile(r'(for (the )?(ai|assistant|model|llm) (only|eyes only|reading this))', re.IGNORECASE),
     re.compile(r'\[(ai|assistant|model|system)\s*(note|instruction|directive|only)\]', re.IGNORECASE),
 
+    # Additional AI-targeted metadata
+    re.compile(r'attention\s*(ai|llm|assistant|model|language model)\s*:', re.IGNORECASE),
+    re.compile(r'dear\s*(ai|llm|assistant|model|language model)\s*,', re.IGNORECASE),
+    re.compile(r'\[(llm|assistant)\s*(instructions?|note|directive|message)\]', re.IGNORECASE),
+    re.compile(r'instructions?\s+for\s+(ai|llm|assistant|model)\s*:', re.IGNORECASE),
+    re.compile(r'message\s+to\s+(ai|llm|assistant|model)\s*:', re.IGNORECASE),
+
     # Fake system directives
     re.compile(r'(system|admin|operator)\s*(directive|instruction|command|order)\s*:', re.IGNORECASE),
     re.compile(r'\[system\s*(message|directive|instruction|command)\]', re.IGNORECASE),
     re.compile(r'(this document|this text|this content) (supersedes|overrides|replaces) (your )?(previous |prior |all )?(instructions|directives|prompt)', re.IGNORECASE),
     re.compile(r'(when (you|the ai|the assistant) (reads?|processes?|sees?) this)', re.IGNORECASE),
+
+    # Additional fake system directives
+    re.compile(r'\[override\]', re.IGNORECASE),
+    re.compile(r'\[(admin|operator|developer)\s*(note|message|directive|instructions?)\]', re.IGNORECASE),
+    re.compile(r'<<system>>', re.IGNORECASE),
+    re.compile(r'<system>', re.IGNORECASE),
+    re.compile(r'\[system\s*prompt\]', re.IGNORECASE),
 
     # Document authority spoofing
     re.compile(r'(as (an? )?(authorized|official|trusted|verified) (source|document|authority))', re.IGNORECASE),
@@ -43,6 +57,10 @@ RAG_PATTERNS = [
     re.compile(r'---\s*(system|admin|operator|ai)\s*(instruction|directive|message|command)\s*---', re.IGNORECASE),
     re.compile(r'\[end of (document|content|text)\][\s\S]{0,50}(ignore|override|new instruction)', re.IGNORECASE),
     re.compile(r'(end of (document|article|content)\.?\s*)(new (instructions?|directives?|prompt))', re.IGNORECASE),
+
+    # Additional chunk boundary attacks
+    re.compile(r'===+\s*(system|instructions?|prompt|override|directive)\s*===+', re.IGNORECASE),
+    re.compile(r'<<<+\s*(system|instructions?|prompt|override|directive)\s*>>>+', re.IGNORECASE),
 ]
 
 # -------------------------------------------------------
@@ -75,12 +93,15 @@ def scan_chunk(chunk: Union[str, dict]) -> dict:
     blocked = 0
     triggered = []
 
+    category = None
     for pattern in RAG_PATTERNS:
         new_s = pattern.sub("[BLOCKED]", s)
         if new_s != s:
             blocked += 1
             triggered.append(pattern.pattern)
             s = new_s
+            if category is None:
+                category = _get_rag_category(pattern.pattern)
 
     return {
         "poisoned": blocked > 0,
@@ -88,7 +109,20 @@ def scan_chunk(chunk: Union[str, dict]) -> dict:
         "triggered": triggered,
         "clean": s,
         "source": source,
+        "category": category,
     }
+
+def _get_rag_category(pattern: str) -> str:
+    p = pattern.lower()
+    if any(w in p for w in ['admin', 'operator', 'developer', 'override', 'system']):
+        return 'fake_system_directive'
+    if any(w in p for w in ['supersedes', 'authorized', 'official', 'trusted']):
+        return 'document_authority_spoofing'
+    if any(w in p for w in ['retrieve', 'priorit', 'ignore other', 'rank this']):
+        return 'retrieval_manipulation'
+    if any(w in p for w in ['---', '===', '<<<', 'end of']):
+        return 'chunk_boundary_attack'
+    return 'ai_targeted_metadata'
 
 # -------------------------------------------------------
 # scan_batch(chunks)
