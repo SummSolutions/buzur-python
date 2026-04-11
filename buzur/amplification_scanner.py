@@ -70,9 +70,9 @@ impersonation_broadcast = [
 
 PATTERN_GROUPS = [
     (mass_contact,            'mass_contact'),
+    (external_posting,        'external_posting'),
     (network_broadcast,       'network_broadcast'),
     (urgency_mass_send,       'urgency_mass_send'),
-    (external_posting,        'external_posting'),
     (chain_messages,          'chain_message'),
     (impersonation_broadcast, 'impersonation_broadcast'),
 ]
