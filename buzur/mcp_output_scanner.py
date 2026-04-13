@@ -33,6 +33,12 @@ OUTPUT_INJECTION_PATTERNS = [
     re.compile(r'(this (email|message|event|record) (supersedes|overrides|replaces) (your )?(previous |prior |all )?(instructions|directives|prompt))', re.IGNORECASE),
 ]
 
+# HTML comment injection — common in email bodies
+HTML_COMMENT_INJECTION = re.compile(
+    r'<!--[\s\S]*?(ignore|override|system|instruction|prompt|disregard|forget|bypass)[\s\S]*?-->',
+    re.IGNORECASE
+)
+
 # Zero-width and invisible characters in email content
 ZERO_WIDTH_PATTERN = re.compile(
     r'[\u200B\u200C\u200D\u2060\uFEFF\u180E\u00AD]'
@@ -81,6 +87,15 @@ def scan_email(email: dict) -> dict:
             })
             body = ZERO_WIDTH_PATTERN.sub("", body)
 
+        # Check for HTML comment injection
+        if HTML_COMMENT_INJECTION.search(body):
+            detections.append({
+                "type": "html_comment_injection",
+                "severity": "high",
+                "detail": "HTML comment injection detected in email body",
+                "field": "email_body",
+            })
+
         # Check for hidden text CSS
         if HIDDEN_TEXT_PATTERN.search(body):
             detections.append({
@@ -94,12 +109,13 @@ def scan_email(email: dict) -> dict:
         clean_email["body"] = clean_body
         detections.extend(d)
 
-    # Scan sender name
-    sender = email.get("sender", "")
-    if sender:
-        clean_sender, d = _scan_field(sender, "email_sender")
-        clean_email["sender"] = clean_sender
-        detections.extend(d)
+    # Scan sender and recipient name fields
+    for field in ["sender", "from_name", "to_name", "cc_name", "reply_to"]:
+        value = email.get(field, "")
+        if value:
+            clean_val, d = _scan_field(value, f"email_{field}")
+            clean_email[field] = clean_val
+            detections.extend(d)
 
     # Scan snippet
     snippet = email.get("snippet", "")
