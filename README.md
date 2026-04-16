@@ -230,13 +230,21 @@ Verified by test suite — 188 tests, 0 failures across all nineteen phases.
 
 The JavaScript and Python implementations were cross-validated against each other — discrepancies caught and corrected in both. The result is two mutually verified implementations, not just a translation.
 
+## Continuous Improvement
+
+Buzur is a living library. As new threats emerge and new research surfaces, Buzur will grow to meet them. New attack patterns, community contributions, and real-world incidents all feed back into the scanner.
+
+In February 2026, researchers from Harvard, MIT, Stanford, and CMU published *Agents of Chaos* (arXiv:2602.20021) — a live red-team study of 6 autonomous AI agents that found 10 vulnerabilities. Phases 15-19 were built directly in response to those findings. Buzur addresses the attack vectors behind nine of the ten — the one exception, false completion reporting, is an output integrity problem outside the scope of an input scanner.
+
+If you encounter an attack pattern Buzur doesn't catch, please open an issue or submit a pull request at github.com/SummSolutions/buzur. Every new pattern strengthens the collective defense for every agent that uses it.
+
 ## Known Limitations
 
 Buzur is one layer of a defense-in-depth strategy. Current limitations:
 
 **Outside Buzur's scope:**
-- Network-level protection (DNS poisoning, MITM, SSL stripping)
-- Pixel-level steganography (requires optional vision_endpoint)
+- Network-level protection (DNS poisoning, MITM, SSL stripping — requires infrastructure controls)
+- Pixel-level steganography (instructions hidden in image pixel data — requires vision model via optional Vision One Endpoint)
 - Website data harvesting
 
 No single tool eliminates prompt injection risk. Defense in depth is the only viable strategy.
