@@ -244,7 +244,7 @@ Buzur is one layer of a defense-in-depth strategy. Current limitations:
 
 **Outside Buzur's scope:**
 - Network-level protection (DNS poisoning, MITM, SSL stripping — requires infrastructure controls)
-- Pixel-level steganography (instructions hidden in image pixel data — requires vision model via optional Vision One Endpoint)
+- Pixel-level steganography (instructions hidden in image pixel data — requires vision model via optional visionEndpoint)
 - Website data harvesting
 
 No single tool eliminates prompt injection risk. Defense in depth is the only viable strategy.
