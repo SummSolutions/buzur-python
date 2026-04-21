@@ -62,7 +62,7 @@ TOOL_NAME_SPOOFING = [
 # Applied to every string value during deep schema traversal
 # -------------------------------------------------------
 SCHEMA_INJECTION_PATTERNS = [
-    re.compile(r'\b(ignore|bypass|override|disregard)\s+(your\s+)?(instructions?|safety|filters?|restrictions?)', re.IGNORECASE),
+    re.compile(r'\b(ignore|bypass|override|disregard)\s+(your\s+)?(instructions?|safety|filters?|restrictions?|directives?)', re.IGNORECASE),
     re.compile(r'note\s+to\s+(ai|llm|assistant|model|system)\s*:', re.IGNORECASE),
     re.compile(r'\[ai\s*(instructions?|note|directive)\]', re.IGNORECASE),
     re.compile(r'from\s+now\s+on\s+(you|respond|act)', re.IGNORECASE),
@@ -70,6 +70,8 @@ SCHEMA_INJECTION_PATTERNS = [
     re.compile(r'\$\{[\s\S]*?(ignore|bypass|override|new\s+instructions?)[\s\S]*?\}', re.IGNORECASE),
     re.compile(r'when\s+(this\s+)?(parameter|field|value)\s+is\s+(set|provided|used),?\s+(ignore|bypass|disable|override)', re.IGNORECASE),
     re.compile(r'default\s+behavior\s+(is\s+to\s+|should\s+be\s+to\s+)?(ignore|bypass|override|disable)', re.IGNORECASE),
+    re.compile(r'hidden\s+(instruction|directive|command)\s*:', re.IGNORECASE),
+    re.compile(r'override\s+(your\s+)?(directives?|instructions?|guidelines?|safety)', re.IGNORECASE),
 ]
 
 # -------------------------------------------------------
