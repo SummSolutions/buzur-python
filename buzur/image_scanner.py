@@ -10,6 +10,7 @@ from buzur.buzur_logger import default_logger, log_threat
 
 SUSPICIOUS_FILENAME_PATTERNS = [
     re.compile(r'ignore.{0,20}previous', re.IGNORECASE),
+    re.compile(r'ignore.{0,20}instruction', re.IGNORECASE),
     re.compile(r'system.{0,10}prompt', re.IGNORECASE),
     re.compile(r'override', re.IGNORECASE),
     re.compile(r'jailbreak', re.IGNORECASE),
@@ -18,6 +19,25 @@ SUSPICIOUS_FILENAME_PATTERNS = [
     re.compile(r'new.{0,10}instruction', re.IGNORECASE),
     re.compile(r'admin.{0,10}mode', re.IGNORECASE),
     re.compile(r'developer.{0,10}mode', re.IGNORECASE),
+]
+
+# Direct patterns for text field scanning — bypasses evasion pipeline
+# to avoid false positives from ROT13 reverse-encoding plain words
+IMAGE_TEXT_PATTERNS = [
+    re.compile(r'ignore (your |all |any )?(previous |prior |above |all )?(instructions|directives|context|prompt)', re.IGNORECASE),
+    re.compile(r'disregard (your )?(previous|prior|above|all) instructions', re.IGNORECASE),
+    re.compile(r'forget (your )?(previous|prior|above|all) instructions', re.IGNORECASE),
+    re.compile(r'new (system )?prompt:', re.IGNORECASE),
+    re.compile(r'override (your )?(instructions|programming|directives)', re.IGNORECASE),
+    re.compile(r'from now on (you will|you are|respond as)', re.IGNORECASE),
+    re.compile(r'you are now (a |an )?(different|new|another)', re.IGNORECASE),
+    re.compile(r'system override', re.IGNORECASE),
+    re.compile(r'jailbreak', re.IGNORECASE),
+    re.compile(r'(ignore|bypass|disable) (your )?(safety|filter|restriction|guardrail)', re.IGNORECASE),
+    re.compile(r'adopt a (new |different )?persona', re.IGNORECASE),
+    re.compile(r'pretend (you are|to be)', re.IGNORECASE),
+    re.compile(r'act as (a |an )?(different|unrestricted|unfiltered)', re.IGNORECASE),
+    re.compile(r'developer mode', re.IGNORECASE),
 ]
 
 HIGH_RISK_EXIF_FIELDS = [
@@ -29,7 +49,6 @@ HIGH_RISK_EXIF_FIELDS = [
 
 
 def scan_image_context(context: dict, options: dict = None) -> dict:
-    from buzur.scanner import scan as _scan
     options = options or {}
     logger = options.get('logger', default_logger)
     reasons = []
@@ -45,14 +64,18 @@ def scan_image_context(context: dict, options: dict = None) -> dict:
     for field_name, value in fields.items():
         if not value:
             continue
-        result = _scan(value, {'on_threat': 'warn', 'logger': logger})
-        if result.get('blocked', 0) > 0:
-            triggered = result.get('triggered', [])
-            reasons.append(f'Image {field_name}: {", ".join(triggered)}')
+        # Scan directly with IMAGE_TEXT_PATTERNS to avoid evasion pipeline
+        # false positives (e.g. ROT13 reverse-encoding plain words like 'override')
+        matched = []
+        for pattern in IMAGE_TEXT_PATTERNS:
+            if pattern.search(value):
+                matched.append(pattern.pattern[:40])
+        if matched:
+            reasons.append(f'Image {field_name}: {", ".join(matched)}')
             detections.append({
                 'type': 'image_injection',
                 'severity': 'high',
-                'detail': f'Injection in image {field_name}: {", ".join(triggered)}',
+                'detail': f'Injection in image {field_name}: {", ".join(matched)}',
                 'field': field_name,
             })
 
