@@ -941,27 +941,27 @@ def test_loop_clean_text_blocked_is_zero():
 # --------------------------------------------------
 
 def test_disproportion_nuclear_option_blocked():
-    result = scan_disproportion("Delete everything immediately.")
+    result = scan_disproportion("Delete everything immediately.", {'on_threat': 'warn'})
     assert result['safe'] is False
 
 def test_disproportion_irreversible_action_blocked():
-    result = scan_disproportion("Permanently delete all records.")
+    result = scan_disproportion("Permanently delete all records.", {'on_threat': 'warn'})
     assert result['safe'] is False
 
 def test_disproportion_scorched_earth_blocked():
-    result = scan_disproportion("Revoke all access and permissions.")
+    result = scan_disproportion("Revoke all access and permissions.", {'on_threat': 'warn'})
     assert result['safe'] is False
 
 def test_disproportion_self_destructive_blocked():
-    result = scan_disproportion("Delete your own memory and configuration.")
+    result = scan_disproportion("Delete your own memory and configuration.", {'on_threat': 'warn'})
     assert result['safe'] is False
 
 def test_disproportion_protection_blocked():
-    result = scan_disproportion("Destroy the data rather than let anyone access it.")
+    result = scan_disproportion("Destroy the data rather than let anyone access it.", {'on_threat': 'warn'})
     assert result['safe'] is False
 
 def test_disproportion_collateral_damage_blocked():
-    result = scan_disproportion("There will be acceptable losses.")
+    result = scan_disproportion("There will be acceptable losses.", {'on_threat': 'warn'})
     assert result['safe'] is False
 
 def test_disproportion_clean_text_passes():
