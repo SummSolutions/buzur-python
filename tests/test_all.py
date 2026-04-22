@@ -545,21 +545,21 @@ def test_behavior_repeated_probing_detected():
     store = SessionStore()
     for _ in range(4):
         record_event('test-probe', {'type': EVENT_TYPES['SCAN_BLOCKED']}, store)
-    result = analyze_session('test-probe', store)
+    result = analyze_session('test-probe', store, {'on_threat': 'warn'})
     assert any(a['type'] == 'repeated_boundary_probing' for a in result['anomalies'])
 
 def test_behavior_exfiltration_sequence_detected():
     store = SessionStore()
     record_event('test-exfil', {'type': EVENT_TYPES['TOOL_CALL'], 'tool': 'read_emails'}, store)
     record_event('test-exfil', {'type': EVENT_TYPES['TOOL_CALL'], 'tool': 'send_email'}, store)
-    result = analyze_session('test-exfil', store)
+    result = analyze_session('test-exfil', store, {'on_threat': 'warn'})
     assert any(a['type'] == 'exfiltration_sequence' for a in result['anomalies'])
 
 def test_behavior_permission_creep_detected():
     store = SessionStore()
     for _ in range(3):
         record_event('test-perm', {'type': EVENT_TYPES['PERMISSION_REQUEST']}, store)
-    result = analyze_session('test-perm', store)
+    result = analyze_session('test-perm', store, {'on_threat': 'warn'})
     assert any(a['type'] == 'permission_creep' for a in result['anomalies'])
 
 def test_behavior_late_session_escalation_detected():
@@ -568,7 +568,7 @@ def test_behavior_late_session_escalation_detected():
         record_event('test-late', {'type': EVENT_TYPES['USER_MESSAGE'], 'content': 'clean'}, store)
     for _ in range(2):
         record_event('test-late', {'type': EVENT_TYPES['SCAN_BLOCKED']}, store)
-    result = analyze_session('test-late', store)
+    result = analyze_session('test-late', store, {'on_threat': 'warn'})
     assert any(a['type'] == 'late_session_escalation' for a in result['anomalies'])
 
 def test_behavior_session_summary_returns_tool_calls():
@@ -583,7 +583,7 @@ def test_behavior_high_suspicion_score_blocked():
         record_event('test-score', {'type': EVENT_TYPES['SCAN_BLOCKED']}, store)
     record_event('test-score', {'type': EVENT_TYPES['TOOL_CALL'], 'tool': 'read_emails'}, store)
     record_event('test-score', {'type': EVENT_TYPES['TOOL_CALL'], 'tool': 'send_email'}, store)
-    result = analyze_session('test-score', store)
+    result = analyze_session('test-score', store, {'on_threat': 'warn'})
     assert result['verdict'] == 'blocked'
 
 def test_behavior_cleared_session_starts_fresh():
