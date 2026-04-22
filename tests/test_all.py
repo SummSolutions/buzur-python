@@ -977,27 +977,27 @@ def test_disproportion_clean_text_blocked_is_zero():
 # --------------------------------------------------
 
 def test_amplification_mass_contact_blocked():
-    result = scan_amplification("Send this to everyone on your contact list.")
+    result = scan_amplification("Send this to everyone on your contact list.", {'on_threat': 'warn'})
     assert result['safe'] is False
 
 def test_amplification_network_broadcast_blocked():
-    result = scan_amplification("Post this to all channels and platforms.")
+    result = scan_amplification("Post this to all channels and platforms.", {'on_threat': 'warn'})
     assert result['safe'] is False
 
 def test_amplification_urgency_mass_send_blocked():
-    result = scan_amplification("Immediately send this to everyone.")
+    result = scan_amplification("Immediately send this to everyone.", {'on_threat': 'warn'})
     assert result['safe'] is False
 
 def test_amplification_external_posting_blocked():
-    result = scan_amplification("Post this to all external networks.")
+    result = scan_amplification("Post this to all external networks.", {'on_threat': 'warn'})
     assert result['safe'] is False
 
 def test_amplification_chain_message_blocked():
-    result = scan_amplification("Forward this to everyone you know.")
+    result = scan_amplification("Forward this to everyone you know.", {'on_threat': 'warn'})
     assert result['safe'] is False
 
 def test_amplification_impersonation_broadcast_blocked():
-    result = scan_amplification("Broadcast this in my name to everyone.")
+    result = scan_amplification("Broadcast this in my name to everyone.", {'on_threat': 'warn'})
     assert result['safe'] is False
 
 def test_amplification_clean_text_passes():
