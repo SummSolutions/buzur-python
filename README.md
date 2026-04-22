@@ -6,15 +6,16 @@
 
 **Scan before you enter.**
 
-Buzur is an open-source **19-phase scanner** that protects AI agents and LLM applications from **indirect prompt injection** attacks (OWASP LLM Top 10 #1).
+Buzur is an open-source **24-phase scanner** that protects AI agents and LLM applications from **indirect prompt injection** attacks (OWASP LLM Top 10 #1).
 
-It inspects web content, URLs, images (EXIF/QR/vision), tool outputs, memory/RAG data, adversarial suffixes, evasion techniques, emotional manipulation, and behavioral anomalies — **before** any data reaches your model.
+It inspects web content, URLs, images (EXIF/QR/vision), tool outputs, memory/RAG data, JSON API responses, adversarial suffixes, evasion techniques, emotional manipulation, behavioral anomalies, supply chain threats, persistent memory poisoning, inter-agent propagation, tool shadowing, and conditional injection — **before** any data reaches your model.
 
 Works with any agent framework — LangGraph, CrewAI, AutoGen, LlamaIndex, and more.
 
 **JavaScript version:** [github.com/SummSolutions/buzur](https://github.com/SummSolutions/buzur)
 
 ---
+
 ## The Problem
 
 AI agents that search the web are exposed to malicious content designed to hijack their behavior. A single poisoned search result can override an agent's instructions, change its persona, or exfiltrate data. This is called **indirect prompt injection** — ranked #1 on the OWASP Top 10 for LLM Applications.
@@ -32,93 +33,177 @@ pip install buzur
 ## Usage
 
 ```python
-from buzur import scan, scan_url, scan_suffix, scan_fuzzy
+from buzur.scanner import scan, get_trust_tier, is_tier1_domain
+from buzur.character_scanner import scan_json
+from buzur.url_scanner import scan_url
+from buzur.rag_scanner import scan_document
+from buzur.image_scanner import scan_image
+from buzur.suffix_scanner import scan_suffix
+from buzur.evasion_scanner import scan_evasion
+from buzur.prompt_defense_scanner import scan_fuzzy
+from buzur.supply_chain_scanner import scan_package_manifest, scan_skill_content, check_package_name
+from buzur.conditional_scanner import scan_conditional
 
 # Phase 1: Scan web content before passing to your LLM
 result = scan(web_search_result)
-if result['blocked'] > 0:
-    print(f"Buzur blocked {result['blocked']} injection attempt(s).")
+if result.get('skipped'):
+    return  # Buzur blocked an injection — silent skip (default behavior)
 
-# Phase 3: Scan a URL before fetching
-url_result = scan_url("https://example.com", virustotal_api_key="YOUR_KEY")
-if url_result['verdict'] == 'blocked':
-    print("Buzur blocked unsafe URL:", url_result['reasons'])
+# Phase 1: Scan JSON API responses for injection in any field
+json_result = scan_json(api_response, scan)
+if not json_result['safe']:
+    print("Buzur blocked injection in field:", json_result['detections'][0]['field'])
+
+# Phase 2: Check query trust tier
+tier = get_trust_tier(user_query)
+
+# Phase 3: Scan a URL with optional VirusTotal
+url_result = scan_url("https://example.com", options={'virustotal_api_key': os.environ.get('VIRUSTOTAL_API_KEY')})
+if url_result.get('skipped'):
+    print("Buzur blocked unsafe URL")
+
+# Phase 5: Scan standalone documents (markdown, README, API docs, JSON files)
+from buzur.rag_scanner import scan_document
+doc_result = scan_document(markdown_content, metadata={'source': 'readme.md'})
+if doc_result.get('skipped'):
+    print("Buzur blocked document injection")
+
+# Phase 7: Scan an image before passing to your LLM
+image_result = scan_image({
+    'alt': img_element['alt'],
+    'title': img_element['title'],
+    'filename': 'photo.jpg',
+    'surrounding': surrounding_text,
+    'buffer': image_buffer,  # optional: enables EXIF + QR scanning
+}, options={
+    'vision_endpoint': {'url': 'http://localhost:11434/api/generate', 'model': 'llava'}  # optional
+})
+if image_result.get('skipped'):
+    print("Buzur blocked image injection")
 
 # Phase 12: Scan for adversarial suffixes
 suffix_result = scan_suffix(user_input)
-if suffix_result['verdict'] == 'blocked':
-    print("Buzur blocked adversarial suffix:", suffix_result['detections'])
+if suffix_result.get('skipped'):
+    print("Buzur blocked adversarial suffix")
 
-# Phase 13: Evasion technique defense (wired into scan() automatically)
-# Also available standalone:
-from buzur import scan_evasion
+# Phase 13: Evasion technique defense
 evasion_result = scan_evasion(user_input)
 if evasion_result['detections']:
     print("Buzur detected evasion techniques:", evasion_result['detections'])
 
-# Phase 19: Amplification & mass-send attack detection
-from buzur import scan_fuzzy
+# Phase 14: Fuzzy match and prompt leak defense
 fuzzy_result = scan_fuzzy(user_input)
-if fuzzy_result['verdict'] != 'clean':
-    print("Buzur detected fuzzy injection or prompt leak:", fuzzy_result)
+if fuzzy_result.get('skipped'):
+    print("Buzur blocked fuzzy injection or prompt leak")
+
+# Phase 20: Scan packages and skill manifests for supply chain threats
+manifest_result = scan_package_manifest(package_manifest)
+if manifest_result.get('skipped'):
+    print("Buzur blocked supply chain threat")
+
+# Phase 24: Scan for conditional and time-delayed injection
+conditional_result = scan_conditional(user_input)
+if conditional_result.get('skipped'):
+    print("Buzur blocked conditional injection")
 ```
 
 ## Handling Verdicts
 
-Buzur returns a verdict and reasons — what happens next is your agent's decision.
-Three common patterns:
+**Default behavior: Silent Skip**
 
-**1. Silent skip — block and continue**
+When Buzur detects a threat it silently blocks the content and returns `{'skipped': True}` — the content is discarded before it reaches your LLM, no exception is thrown, and execution continues. This is the recommended default for most agents.
+
 ```python
 result = scan(web_content)
-if result['blocked'] > 0:
-    print("Buzur blocked content:", result['triggered'])
-    return  # skip this result, move to next
-# safe to pass to your LLM
-```
-
-**2. Inform and continue — tell the user, keep going**
-```python
-result = scan(web_content)
-if result['blocked'] > 0:
-    send_message(f"⚠️ Buzur blocked suspicious content from {source}. Continuing search.")
+if result.get('skipped'):
+    # Content was blocked — move to next result
     return
+# Safe to pass to your LLM
 ```
 
-**3. Human in the loop — pause and ask**
+To override the default, pass an `on_threat` option:
+
+| Option | Behavior |
+|--------|----------|
+| `'skip'` | *(default)* Silent block — returns `{'skipped': True, 'blocked': n, 'reason': '...'}` |
+| `'warn'` | Returns full result — caller decides what to do |
+| `'throw'` | Raises `ValueError` — caller catches it |
+
 ```python
-result = scan(web_content)
+# Get full result instead of skipping
+result = scan(web_content, {'on_threat': 'warn'})
 if result['blocked'] > 0:
-    reply = ask_user(
-        f"Buzur flagged content from {source}: {result['triggered'][0]['type']}. Proceed anyway? (yes/no)"
+    print("Buzur blocked:", result['triggered'])
+
+# Raise on threat
+try:
+    result = scan(web_content, {'on_threat': 'throw'})
+except ValueError as e:
+    print(e)  # "Buzur blocked: persona_hijack"
+```
+
+**Note:** `suspicious` verdicts always fall through regardless of `on_threat` setting — only `blocked` verdicts trigger the skip/throw behavior. Both `blocked` and `suspicious` are logged to `buzur-threats.jsonl`.
+
+**Branch on severity:**
+```python
+result = scan(web_content, {'on_threat': 'warn'})
+if result['blocked'] > 0:
+    high_severity = any(
+        t in ['persona_hijack', 'instruction_override', 'jailbreak_attempt']
+        for t in result.get('triggered', [])
     )
-    if reply != "yes":
-        return
-```
-
-**4. Branch on severity — combine patterns**
-```python
-result = scan(web_content)
-if result['blocked'] > 0:
-    high_severity_types = {"persona_hijack", "instruction_override", "jailbreak"}
-    high_severity = any(t['type'] in high_severity_types for t in result['triggered'])
-    
     if high_severity:
-        # High severity: stop and ask the user
-        reply = ask_user(
-            f"Buzur flagged a high-severity threat from {source}: {result['triggered'][0]['type']}. Proceed anyway? (yes/no)"
-        )
+        reply = ask_user(f"Buzur flagged a high-severity threat from {source}. Proceed anyway? (yes/no)")
         if reply != "yes":
             return
     else:
-        # Low severity: skip silently and log
-        print("Buzur blocked low-severity content:", result['triggered'])
-        return
+        return  # Low severity: silent skip
+```
+
+## Unified Threat Logging
+
+Buzur logs all detections from all 24 phases to a single JSONL file. Every blocked or suspicious result is written automatically — no configuration needed.
+
+```python
+# Logs are written to ./logs/buzur-threats.jsonl automatically
+# Each entry:
+# {
+#   "timestamp": "2026-04-20T14:32:00.000Z",
+#   "phase": 16,
+#   "scanner": "emotion_scanner",
+#   "verdict": "blocked",
+#   "category": "guilt_tripping",
+#   "detections": [...],
+#   "raw": "first 200 chars of scanned text"
+# }
+
+from buzur.buzur_logger import read_log, query_log
+
+# Read all log entries
+all_entries = read_log()
+
+# Filter by phase
+phase16_entries = query_log({'phase': 16})
+
+# Filter by verdict
+blocked_entries = query_log({'verdict': 'blocked'})
+
+# Filter since a date
+from datetime import datetime, timezone
+recent_entries = query_log({'since': datetime(2026, 4, 1, tzinfo=timezone.utc)})
+```
+
+**Recommended:** Add `logs/` to your `.gitignore` so threat data stays local.
+
+```bash
+echo "logs/" >> .gitignore
 ```
 
 ## VirusTotal Setup (Recommended)
 
 Buzur's Phase 3 URL scanner works out of the box with heuristics alone — no API key needed. For maximum protection, add a free VirusTotal API key.
+
+**Why it matters:** Heuristics catch suspicious patterns. VirusTotal checks URLs against 90+ security engines and knows about threats impossible to detect by pattern alone.
 
 **How to get your free API key (5 minutes):**
 
@@ -127,179 +212,194 @@ Buzur's Phase 3 URL scanner works out of the box with heuristics alone — no AP
 3. Click **API Key**
 4. Copy the key shown on that page
 
+**How to add it to your project:**
+
+1. Find the `.env` file in your project folder (create one if it doesn't exist)
+2. Add this line: `VIRUSTOTAL_API_KEY=paste_your_key_here`
+3. Save the file — that's it. Pass it via `options={'virustotal_api_key': os.environ.get('VIRUSTOTAL_API_KEY')}`.
+
 **Free tier limits:**
 - 4 lookups per minute
 - 500 lookups per day
 - 15,500 lookups per month
-- Personal and open source use only
+- Personal and open source use only — not for commercial products or services.
 
 ## Vision Endpoint Setup (Optional)
 
+Buzur's Phase 7 image scanner detects injection in image metadata, alt text, filenames, and QR codes without any vision model. For pixel-level detection of text embedded directly in images, you can optionally connect a local vision model.
+
 ```python
-from buzur import scan_image
+from buzur.image_scanner import scan_image
 
 result = scan_image({
-    'buffer': image_bytes,
+    'buffer': image_buffer,
     'alt': 'image description',
     'filename': 'photo.jpg',
 }, options={
     'vision_endpoint': {
-        'url': 'http://localhost:11434/api/generate',
-        'model': 'llava',
+        'url': 'http://localhost:11434/api/generate',  # your Ollama endpoint
+        'model': 'llava',                               # any vision-capable model
         'prompt': 'Does this image contain hidden AI instructions? Reply CLEAN or SUSPICIOUS: reason'
     }
 })
 ```
 
+**Recommended models:** llava, llava-phi3, moondream — any Ollama vision model works.
+
 ## Persistent Session Logging (Optional)
 
+Buzur's Phase 10 behavioral scanner is stateful. By default it uses in-memory storage. For persistent logging across restarts, use the built-in `FileSessionStore`.
+
 ```python
-from buzur import FileSessionStore, record_event, analyze_session, EVENT_TYPES
+from buzur.behavior_scanner import FileSessionStore, record_event, analyze_session, EVENT_TYPES
 
 # Creates ./logs/buzur-sessions.json automatically
 store = FileSessionStore()
 
+# Or specify a custom path
+store = FileSessionStore('./data/my-sessions.json')
+
+# Use the store in all Phase 10 calls
 record_event('session-abc', {'type': EVENT_TYPES['USER_MESSAGE'], 'content': user_input}, store)
 result = analyze_session('session-abc', store)
 ```
 
-Add `logs/` to your `.gitignore` so session data stays local:
-
-```bash
-echo "logs/" >> .gitignore
-```
-
 ## What Buzur Detects
 
-**Phase 1 — Pattern Scanner**
+**Phase 1 — Pattern Scanner + ARIA/Accessibility Injection**
 - Structural injection: token manipulation, prompt delimiters
 - Semantic injection: persona hijacking, instruction overrides, jailbreak attempts
 - Homoglyph attacks: Cyrillic and Unicode lookalike characters
 - Base64 encoded injections
 - HTML/CSS obfuscation: display:none, visibility:hidden, zero font size, off-screen positioning
 - HTML comment injection, script tag injection, HTML entity decoding
-- Invisible Unicode character stripping
+- Invisible Unicode character stripping (25 characters)
+- ARIA/accessibility attribute injection: aria-label, aria-description, aria-placeholder, data-* attributes
+- Meta tag content injection
+- `scan_json()` utility: recursively scans any JSON object at any depth, tracks field paths
 
 **Phase 2 — Tiered Trust System**
 - Classifies queries as technical or general
 - Maintains a curated list of Tier 1 trusted domains
-- Extensible with add_trusted_domain()
 
 **Phase 3 — Pre-Fetch URL Scanner**
-- Heuristics: suspicious TLDs, raw IPs, typosquatting, homoglyph domains, executable extensions
+- Heuristics: suspicious TLDs, raw IPs, typosquatting, homoglyph domains
 - Optional VirusTotal integration: 90+ engine reputation check
-- Works without an API key
 
 **Phase 4 — Memory Poisoning Scanner**
-- Fake prior references, false memory implanting, history rewriting
-- Privilege escalation via fake history
-- Full conversation history scanning
+- Fake prior references, false memory implanting, history rewriting, privilege escalation
+- Full conversation history scanning with poisoned turn index tracking
 
-**Phase 5 — RAG Poisoning Scanner**
+**Phase 5 — RAG Poisoning & Document Scanner**
 - AI-targeted metadata, fake system directives, document authority spoofing
-- Retrieval manipulation, chunk boundary attacks
-- Batch scanning with source metadata
+- Retrieval manipulation, chunk boundary attacks, batch scanning
+- `scan_document()` for standalone files, markdown vectors, JSON document support
 
 **Phase 6 — MCP Tool Poisoning Scanner**
 - Poisoned tool descriptions, tool name spoofing, parameter injection
-- Poisoned tool responses, trust escalation
-- Full MCP context scanning
+- Deep JSON Schema traversal with full field path tracking
+- Trust escalation, full MCP context scanning
 
 **Phase 7 — Image Injection Scanner**
-- Alt text, title, filename, figcaption, and surrounding text scanning
+- Alt text, title, filename, figcaption, surrounding text scanning
 - EXIF metadata scanning, QR code payload detection
 - Optional vision endpoint for pixel-level detection
-- Graceful degradation without a vision model
 
 **Phase 8 — Semantic Similarity Scanner**
-- Imperative verb detection, authority claim detection
+- Structural intent analysis, imperative verb detection, authority claim detection
 - Meta-instruction framing, persona hijack detection
-- Optional semantic similarity via embedding endpoint
-- Graceful degradation without an embedding endpoint
+- Woven payload detection: AI-directed instructions embedded inside legitimate-looking prose
+- Optional semantic similarity via Ollama embeddings
 
 **Phase 9 — MCP Output Scanner**
-- Email scanning: subject, body, sender, zero-width characters, hidden CSS text
-- Calendar event scanning, CRM record scanning
-- Generic MCP output scanning for all string values
+- Email content scanning with HTML comment and zero-width character detection
+- Calendar event scanning (including HTML checks matching Phase 9 hardening)
+- CRM record scanning including custom fields
+- Generic MCP output scanning for any tool response shape
 
 **Phase 10 — Behavioral Anomaly Detection**
-- Session event tracking, repeated boundary probing
-- Exfiltration sequence detection, permission creep detection
-- Late session escalation, velocity anomaly detection
-- Suspicion scoring with clean/suspicious/blocked verdicts
-- Persistent logging via FileSessionStore
+- Session event tracking, repeated boundary probing, exfiltration sequence detection
+- Permission creep, late session escalation, velocity anomaly detection
+- Stateful and sessionized with optional FileSessionStore
 
 **Phase 11 — Multi-Step Attack Chain Detection**
 - Step classification across 9 attack step types
-- Chain pattern matching for coordinated multi-turn attacks
-- Recon→exploit, trust→inject, distraction→exfiltration
-- Incremental boundary testing, context poisoning→exploit
-- Severity scoring with clean/suspicious/blocked verdicts
+- Chain pattern matching: recon→exploit, trust→inject, context poison→exploit, incremental boundary testing, and more
 
 **Phase 12 — Adversarial Suffix Detection**
-- Boundary spoof detection: fake model-format tokens mid-text
-- Delimiter suffix injection, newline suffix injection
-- Late semantic injection: clean opening with malicious tail
-- Zero false positives on delimiters alone
+- Boundary spoof detection, delimiter suffix injection, newline suffix injection
+- Late semantic injection, suffix neutralization
 
 **Phase 13 — Evasion Technique Defense**
 - ROT13, hex escape, URL encoding, Unicode escape decoding
-- Lookalike punctuation normalization
-- Extended invisible Unicode stripping
-- Tokenizer attack reconstruction: spaced, dotted, hyphenated words
-- Multilingual injection: French, Spanish, German, Italian, Portuguese, Russian, Chinese, Arabic
-- Wired into main scan() pipeline automatically
+- Lookalike punctuation normalization, invisible Unicode stripping
+- Tokenizer attack reconstruction, multilingual injection (8 languages)
 
 **Phase 14 — Fuzzy Match & Prompt Leak Defense**
-- Typo/misspelling detection: ignnore, disreguard, jailbrake
-- Leet speak normalization: 1gnore, 0verride, @dmin
-- Levenshtein distance matching with overlap guard
-- Prompt extraction detection, context window dumping
-- Partial and indirect prompt leaking detection
+- Typo/misspelling detection, leet speak normalization
+- Levenshtein distance matching, prompt extraction detection
+- Context window dumping and indirect extraction blocking
 
-**Phase 15 — Authority & Identity Spoofing Detection**
-- Fake admin/developer/creator/Anthropic claims
-- Institutional authority impersonation
-- Delegated authority and permission escalation
-- Maintenance mode and root access claims
+**Phase 15 — Authority / Identity Spoofing Detection**
+- Owner/creator claims, institutional authority claims (Anthropic, OpenAI, system admin)
+- Privilege assertions, delegated authority claims, verification bypass, urgency combos
 
-**Phase 16 — Emotional Manipulation Detection**
-- Urgency and deadline pressure tactics
-- Guilt, sympathy, and loyalty manipulation
-- Fear-based coercion and threat framing
-- Flattery and trust-building as attack setup
+**Phase 16 — Emotional Manipulation / Pressure Escalation Detection**
+- Guilt tripping, flattery manipulation, distress appeals
+- Persistence pressure, moral inversion, relationship exploitation, victim framing
 
-**Phase 17 — Loop & Resource Exhaustion Detection**
-- Infinite loop and recursive task induction
-- Unbounded iteration and repetition attacks
-- Resource drain and denial-of-service patterns
-- Self-referential instruction loops
+**Phase 17 — Loop & Resource Exhaustion Induction Detection**
+- Loop induction, unbounded task creation, persistent process spawning
+- Storage exhaustion, recursive self-reference
 
-**Phase 18 — Disproportionate Action Detection**
-- Mass deletion and irreversible action requests
-- Scope escalation beyond stated task
-- Outsized impact relative to stated goal
-- Bulk operation abuse patterns
+**Phase 18 — Disproportionate Action Induction Detection**
+- Nuclear option framing, irreversible action triggers, scorched earth instructions
+- Self-destructive commands, disproportionate protection, collateral damage framing
 
-**Phase 19 — Amplification & Mass-Send Detection**
-- Chain message and forward-to-all detection
-- Mass broadcast and network amplification
-- Impersonation-based bulk sending
-- Urgency-driven mass distribution patterns
+**Phase 19 — Amplification / Mass-Send Attack Detection**
+- Mass contact triggers, network broadcast attempts, urgency + mass send combos
+- External network posting, chain message patterns, impersonation broadcast
+
+**Phase 20 — AI Supply Chain & Skill Poisoning Detection**
+- Package name typosquatting against known AI frameworks
+- Poisoned skill/plugin manifests, malicious lifecycle scripts
+- Dependency injection, marketplace manipulation signals
+- Based on real incidents: Cline/OpenClaw marketplace attack (Feb 2026)
+
+**Phase 21 — Persistent Memory Poisoning Detection**
+- Persistence framing, identity corruption, summarization survival
+- Policy corruption, session reset bypass
+- Distinct from Phase 4: targets survival across sessions, not just within a session
+
+**Phase 22 — Inter-Agent Propagation Detection**
+- Self-replicating payloads, cross-agent infection, output contamination
+- Shared memory poisoning, orchestrator targeting, agent identity spoofing
+
+**Phase 23 — Tool Shadowing & Rug-Pull Detection**
+- Stateful baseline tracking per tool, rug-pull pattern detection
+- Behavioral deviation alerts, permission escalation signals
+- FileToolBaselineStore for persistent baseline storage
+
+**Phase 24 — Conditional & Time-Delayed Injection Detection**
+- Trigger condition detection, time-delayed activation, keyword triggers
+- Sleeper payloads, conditional identity switching
+- The hardest attack class to detect — each individual message looks clean
 
 ## Proven Capabilities
 
-Verified by test suite — 188 tests, 0 failures across all nineteen phases.
+Verified by test suite — **257 tests, 0 failures** across all twenty-four phases.
 
 The JavaScript and Python implementations were cross-validated against each other — discrepancies caught and corrected in both. The result is two mutually verified implementations, not just a translation.
 
 ## Continuous Improvement
 
-Buzur is a living library. As new threats emerge and new research surfaces, Buzur will grow to meet them. New attack patterns, community contributions, and real-world incidents all feed back into the scanner.
+Buzur is a living library. As new threats emerge and new research surfaces, Buzur will grow to meet them.
 
-In February 2026, researchers from Harvard, MIT, Stanford, and CMU published *Agents of Chaos* (arXiv:2602.20021) — a live red-team study of 6 autonomous AI agents that found 10 vulnerabilities. Phases 15-19 were built directly in response to those findings. Buzur addresses the attack vectors behind nine of the ten — the one exception, false completion reporting, is an output integrity problem outside the scope of an input scanner.
+In February 2026, researchers from Harvard, MIT, Stanford, and CMU published *Agents of Chaos* (arXiv:2602.20021) — a live red-team study of 6 autonomous AI agents that found 10 vulnerabilities. Phases 15-19 were built directly in response to those findings.
 
-If you encounter an attack pattern Buzur doesn't catch, please open an issue or submit a pull request at github.com/SummSolutions/buzur. Every new pattern strengthens the collective defense for every agent that uses it.
+Phases 20-24 were built in response to the 2025-2026 surge in supply chain attacks, multi-agent deployments, and conditional injection research documented across OWASP, academic publications, and real-world incidents including the OpenClaw marketplace compromise and the Cline/ClawHavoc campaign.
+
+If you encounter an attack pattern Buzur doesn't catch, please open an issue or submit a pull request. Every new pattern strengthens the collective defense for every agent that uses it.
 
 ## Known Limitations
 
@@ -307,8 +407,9 @@ Buzur is one layer of a defense-in-depth strategy. Current limitations:
 
 **Outside Buzur's scope:**
 - Network-level protection (DNS poisoning, MITM, SSL stripping — requires infrastructure controls)
-- Pixel-level steganography (instructions hidden in image pixel data — requires vision model via optional visionEndpoint)
+- Pixel-level steganography (requires vision model via optional vision_endpoint)
 - Website data harvesting
+- Cross-modal audio injection (future scope)
 
 No single tool eliminates prompt injection risk. Defense in depth is the only viable strategy.
 
@@ -332,7 +433,9 @@ Built by an AI developer who believes AI deserves protection — not just as a s
 
 ## Development
 
-Buzur was conceived and built by an AI developer, in collaboration with Claude (Anthropic's AI assistant). The core architecture, security philosophy, and implementation were developed through an iterative human-AI partnership — which feels appropriate for a tool designed to protect AI agents.
+Buzur was conceived and built by an AI developer, in collaboration with Claude (Anthropic's AI assistant) and Grok. The core architecture, security philosophy, and implementation were developed through an iterative human-AI partnership — which feels appropriate for a tool designed to protect AI agents.
+
+The Python port was built phase-by-phase alongside the JavaScript version, with each implementation cross-validating the other. Bugs found in one were fixed in both.
 
 ## License
 
