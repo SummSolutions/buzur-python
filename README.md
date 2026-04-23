@@ -45,9 +45,9 @@ from buzur.url_scanner import scan_url
 from buzur.conditional_scanner import scan_conditional
 
 # Most common pattern — scan before passing to your LLM
-result = scan(incoming_content)   # web result, tool output, RAG chunk, etc.
+result = scan(incoming_content) # web result, tool output, RAG chunk, etc.
 if result.get('skipped'):
-    return  # Safe silent block (recommended default for production)
+    return # Threat blocked — safe silent skip (default)
 
 # Scan JSON responses (common with APIs)
 json_result = scan_json(api_response, scan)
