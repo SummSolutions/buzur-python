@@ -63,7 +63,7 @@ if conditional_result.get('skipped'):
 **Default behavior: Silent Skip** (`on_threat='skip'`)
 
 When Buzur detects a threat, it silently blocks the content and returns `{'skipped': True}`.  
-The dangerous content is discarded **before** it reaches your LLM, and your code continues safely. This is the recommended default for most production agents.
+The dangerous content is blocked **before** it reaches your LLM, and your code continues safely. This is the recommended default for most production agents.
 
 ```python
 result = scan(incoming_content)
