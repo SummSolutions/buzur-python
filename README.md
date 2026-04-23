@@ -6,13 +6,13 @@
 
 **Scan before you enter.**
 
-Buzur is an open-source **24-phase scanner** that protects AI agents and LLM applications from **indirect prompt injection** attacks (OWASP LLM Top 10 #1).
+Buzur is an open-source **24-phase scanner** that protects AI agents and LLM applications from **indirect prompt injection attacks** (OWASP LLM Top 10 #1).
 
-It inspects web content, URLs, images (EXIF/QR/vision), tool outputs, memory/RAG data, JSON API responses, adversarial suffixes, evasion techniques, emotional manipulation, behavioral anomalies, supply chain threats, persistent memory poisoning, inter-agent propagation, tool shadowing, and conditional injection — **before** any data reaches your model.
+It inspects incoming content — web results, URLs, images (EXIF/QR/vision), tool outputs, RAG/memory data, JSON APIs, adversarial suffixes, evasion tricks, emotional manipulation, behavioral anomalies, supply-chain risks, **persistent memory poisoning**, **inter-agent propagation**, **tool shadowing**, and **conditional/time-delayed injections** — **before** any data reaches your model.
 
-Works with any agent framework — LangGraph, CrewAI, AutoGen, LlamaIndex, and more.
+Works seamlessly with Python agent frameworks: **LangGraph**, **CrewAI**, **AutoGen**, **LlamaIndex**, **Haystack**, and more.
 
-**JavaScript version:** [github.com/SummSolutions/buzur](https://github.com/SummSolutions/buzur)
+**JavaScript version**: [github.com/SummSolutions/Buzur](https://github.com/SummSolutions/Buzur)
 
 ---
 
